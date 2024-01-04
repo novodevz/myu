@@ -1,0 +1,7 @@
+venv/
+instance/
+backend/__pycache__/
+backend/myU.db/
+backend/migrations/
+backend/static/images/uploads/*
+/dev_imgs
