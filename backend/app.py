@@ -26,17 +26,25 @@ login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
 
-# User class
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
     hashed_pw = db.Column(db.String(60), nullable=False)
     img = db.Column(db.String(255), nullable=False)
+    username = db.Column(db.String(80), unique=True, nullable=False)
 
     # Define one-to-many relationship with Grade
     grades = db.relationship("Grade", backref="user", lazy=True)
 
-    def get_username(self):
+    def __init__(self, email, hashed_pw, img, username=None):
+        self.email = email
+        self.hashed_pw = hashed_pw
+        self.img = img
+
+        # Set the username based on the email if not provided
+        self.username = username or self.get_default_username()
+
+    def get_default_username(self):
         return self.email.split("@")[0]
 
 
