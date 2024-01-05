@@ -1,25 +1,13 @@
-import os
-
-from flask import Flask, current_app, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, url_for
 from flask_bcrypt import Bcrypt
 from flask_cors import CORS
-from flask_login import (
-    LoginManager,
-    UserMixin,
-    current_user,
-    login_required,
-    login_user,
-    logout_user,
-)
+from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
-from PIL import Image
-from werkzeug.utils import secure_filename
+from image_handler import handle_uploaded_file
 
 app = Flask(__name__)
 
-# CORS(app, resources={r"/*": {"origins": "*"}})
-# CORS(app, resources={r"/*": {"origins": "http://127.0.0.1:5500"}})
 CORS(app)
 
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///myU.db"
@@ -27,7 +15,6 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["ROOT_URL"] = "localhost:5000/"
 app.config["UPLOAD_FOLDER"] = "static/images/uploads"
 app.config["DEFAULT_IMG"] = "static/images/default.jpg"
-app.config["ALLOWED_EXTENSIONS"] = {"png", "jpg", "jpeg", "gif"}
 
 app.secret_key = "devkey"
 db = SQLAlchemy(app)
@@ -49,6 +36,9 @@ class User(db.Model, UserMixin):
     # Define one-to-many relationship with Grade
     grades = db.relationship("Grade", backref="user", lazy=True)
 
+    def get_username(self):
+        return self.email.split("@")[0]
+
 
 # Course class
 class Course(db.Model):
@@ -69,31 +59,9 @@ class Grade(db.Model):
     course_id = db.Column(db.Integer, db.ForeignKey("course.id"), nullable=False)
 
 
-print(app.root_path)
-
-
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
-
-
-def allowed_file(filename):
-    return (
-        "." in filename
-        and filename.rsplit(".", 1)[1].lower() in app.config["ALLOWED_EXTENSIONS"]
-    )
-
-
-def resize_image(file_path):
-    img = Image.open(file_path)
-    img.thumbnail((300, 300))  # Resize image to fit within a 300x300 square
-    img.save(file_path)
-
-
-# Serve uploaded images
-@app.route("/static/images/<filename>")
-def serve_image(filename):
-    return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
 
 # Index endpoint
@@ -104,7 +72,7 @@ def index():
 
 # Signup endpoint with image upload
 @app.route("/signup", methods=["POST"])
-def signup():
+async def signup():
     email = request.form.get("email")
     password = request.form.get("password")
 
@@ -123,20 +91,9 @@ def signup():
     # Upload and save the user's image
     if "file" in request.files:
         file = request.files["file"]
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-            file.save(file_path)
-
-            # Resize the image (optional)
-            resize_image(file_path)
-        else:
-            filename = None
+        img_path = handle_uploaded_file(file, app.config.UPLOAD_FOLDER)
     else:
-        filename = None
-
-    # If no file is provided, use the default image
-    img_path = file_path if filename else app.config["DEFAULT_IMG"]
+        img_path = app.config["DEFAULT_IMG"]
 
     # Add new user to the database
     new_user = User(email=email, hashed_pw=hashed_pw, img=img_path)
@@ -154,6 +111,9 @@ def signup():
     )
 
 
+from sqlalchemy.exc import DatabaseError
+
+
 # Login endpoint
 @app.route("/login", methods=["POST"])
 def login():
@@ -161,22 +121,40 @@ def login():
     email = data.get("email")
     password = data.get("password")
 
-    # Check if the user exists
-    user = User.query.filter_by(email=email).first()
-    if user and bcrypt.check_password_hash(user.hashed_pw, password):
-        login_user(user)
+    try:
+        # Check if the user exists
+        user = User.query.filter_by(email=email).first()
 
-        # Fetch additional information for the account.html
-        user_info = {"email": user.email, "img_path": user.img}
+        if user and bcrypt.check_password_hash(user.hashed_pw, password):
+            login_user(user)
 
-        # Populate the courses and grades based on your data model
-        # for grade in user.grades:
-        #     user_info["courses"].append(grade.course.name)
-        #     user_info["grades"].append(grade.score)
+            # Fetch additional information for the account.html
+            user_info = {
+                "email": user.email,
+                "img_url": f"http://localhost:5000/{user.img}",
+                "username": user.get_username(),
+                "courses": [],  # List to store course information
+                "scores": [],
+            }
+            # Populate the courses and grades based on your data model
+            for grade in user.grades:
+                score = {
+                    "course_name": grade.course.name,
+                    "score": grade.score,
+                }
+                user_info["courses"].append(grade.course.name)
+                user_info["scores"].append(score)
+            return jsonify(user_info)
 
-        return jsonify(user_info)
+        return jsonify({"error": "Invalid email or password. Please try again."}), 401
 
-    return jsonify({"error": "Invalid email or password. Please try again."}), 401
+    except DatabaseError as e:
+        print(f"Database error: {e}")
+        return jsonify({"error": "Internal Server Error"}), 500
+
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return jsonify({"error": "Internal Server Error"}), 500
 
 
 # Logout endpoint
