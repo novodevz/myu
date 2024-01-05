@@ -43,7 +43,7 @@
             await loadPage('base');
         });
 
-        async function login() {
+        const login = async () => {
             const formData = new FormData(document.getElementById('loginForm'));
 
             try {
@@ -71,7 +71,8 @@
                 // Handle network error or other issues
                 console.error('Error during login:', error.message);
             }
-        }
+        };
+
     </script>
 </body>
 

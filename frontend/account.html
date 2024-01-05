@@ -26,12 +26,15 @@
 <body>
     <div id="topbar">
         <!-- Display user's profile image and username -->
-        <img id="profile-image" alt="Profile Image" style="width: 50px; height: 50px; border-radius: 50%;">
-        <span id="username"></span>
-
+        <div id="profile-container">
+            <img id="profile-image" alt="Profile Image" style="width: 50px; height: 50px; border-radius: 50%;">
+            <strong id="username"></strong>
+        </div>
+    
         <!-- Logout option -->
         <a class="btn btn-danger" onclick="logout()">Logout</a>
     </div>
+    
 
     <div id="main-body">
         <!-- User details from the User table -->
@@ -65,8 +68,8 @@
 
         const updateUI = (userInfo) => {
             // Update topbar with user's profile image and username
-            document.getElementById('profile-image').src = userInfo.img_path;
-            document.getElementById('username').textContent = userInfo.email;
+            document.getElementById('profile-image').src = userInfo.img_url;
+            document.getElementById('username').textContent = userInfo.username;
 
             // Update user details
             const userEmailElement = document.getElementById('user-email');
@@ -74,9 +77,9 @@
 
             // Update grades
             const gradesList = document.getElementById('grades-list');
-            userInfo.courses.forEach((course, index) => {
+            userInfo.scores.forEach((score) => {
                 const listItem = document.createElement('li');
-                listItem.textContent = `${course}: ${userInfo.grades[index]}`;
+                listItem.textContent = `${score.course_name}: ${score.score}`;
                 gradesList.appendChild(listItem);
             });
         };
