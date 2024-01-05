@@ -30,8 +30,8 @@ class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
     hashed_pw = db.Column(db.String(60), nullable=False)
-    img = db.Column(db.String(255), nullable=False)
     username = db.Column(db.String(80), unique=True, nullable=False)
+    img = db.Column(db.String(255), nullable=False)
 
     # Define one-to-many relationship with Grade
     grades = db.relationship("Grade", backref="user", lazy=True)
