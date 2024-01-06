@@ -1,7 +1,10 @@
+import datetime
+
+import jwt
 from flask import Flask, jsonify, request, send_from_directory, url_for
 from flask_bcrypt import Bcrypt
 from flask_cors import CORS
-from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from image_handler import handle_uploaded_file
@@ -16,17 +19,24 @@ app.config["ROOT_URL"] = "localhost:5000/"
 app.config["UPLOAD_FOLDER"] = "static/images/uploads"
 app.config["DEFAULT_IMG"] = "static/images/default.jpg"
 
+# Configure JWT settings
+app.config["JWT_SECRET_KEY"] = "your-secret-key"  # Change this to a secure secret key
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = datetime.timedelta(
+    hours=1
+)  # Set the expiration time
+app.config["JWT_ALGORITHM"] = "HS256"  # Set the algorithm
+
+# Initialize JWT extension
+jwt = JWTManager(app)
+
 app.secret_key = "devkey"
+
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 bcrypt = Bcrypt(app)
 
-# Flask-Login setup
-login_manager = LoginManager(app)
-login_manager.login_view = "login"
 
-
-class User(db.Model, UserMixin):
+class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
     hashed_pw = db.Column(db.String(60), nullable=False)
@@ -67,11 +77,6 @@ class Grade(db.Model):
     course_id = db.Column(db.Integer, db.ForeignKey("course.id"), nullable=False)
 
 
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
-
-
 # Index endpoint
 @app.route("/")
 def index():
@@ -108,9 +113,6 @@ async def signup():
     db.session.add(new_user)
     db.session.commit()
 
-    # Log in the user after signing up
-    login_user(new_user)
-
     return jsonify(
         {
             "message": f"Successfully signed up! Welcome, {email}.",
@@ -134,7 +136,21 @@ def login():
         user = User.query.filter_by(email=email).first()
 
         if user and bcrypt.check_password_hash(user.hashed_pw, password):
-            login_user(user)
+            # Generate JWT token
+            # Using jwt library
+            # token = jwt.encode(
+            #     {
+            #         "user_id": user.id,
+            #         "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1),
+            #     },
+            #     app.config["JWT_SECRET_KEY"],
+            #     algorithm="HS256",
+            # )
+
+            # Create an access token for the user
+            # Using Flask-JWT-Extended
+            # global conf added at the top
+            access_token = create_access_token(identity=user.id)
 
             # Fetch additional information for the account.html
             user_info = {
@@ -143,6 +159,7 @@ def login():
                 "username": user.get_username(),
                 "courses": [],  # List to store course information
                 "scores": [],
+                "token": access_token,
             }
             # Populate the courses and grades based on your data model
             for grade in user.grades:
@@ -167,9 +184,8 @@ def login():
 
 # Logout endpoint
 @app.route("/logout")
-@login_required
+@jwt_required
 def logout():
-    logout_user()
     return jsonify({"message": "You have been logged out."})
 
 
