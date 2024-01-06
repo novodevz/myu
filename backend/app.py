@@ -42,9 +42,9 @@ class User(db.Model, UserMixin):
         self.img = img
 
         # Set the username based on the email if not provided
-        self.username = username or self.get_default_username()
+        self.username = username or self.get_username()
 
-    def get_default_username(self):
+    def get_username(self):
         return self.email.split("@")[0]
 
 
