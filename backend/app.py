@@ -3,10 +3,15 @@
 import datetime
 
 # import jwt
-from flask import Flask, jsonify, request, send_from_directory, url_for
+from flask import Flask, jsonify, request
 from flask_bcrypt import Bcrypt
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required
+from flask_jwt_extended import (
+    JWTManager,
+    create_access_token,
+    get_jwt_identity,
+    jwt_required,
+)
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from image_handler import handle_uploaded_file
@@ -109,12 +114,12 @@ async def signup():
     # Upload and save the user's image
     if "file" in request.files:
         file = request.files["file"]
-        img_path = handle_uploaded_file(file, app.config.UPLOAD_FOLDER)
+        new_img_name = handle_uploaded_file(file, app.config.UPLOAD_FOLDER)
     else:
-        img_path = app.config["DEFAULT_IMG"]
+        new_img_name = app.config["DEFAULT_IMG"]
 
     # Add new user to the database
-    new_user = User(email=email, hashed_pw=hashed_pw, img=img_path)
+    new_user = User(email=email, hashed_pw=hashed_pw, img=new_img_name)
     db.session.add(new_user)
     db.session.commit()
 
@@ -192,6 +197,78 @@ def login():
 @jwt_required
 def logout():
     return jsonify({"message": "You have been logged out."})
+
+
+import os
+
+CORS(app, resources={r"/update_account": {"origins": "http://127.0.0.1:5500"}})
+
+
+# Update the /update_account endpoint
+@app.route("/update_account", methods=["POST"])
+@jwt_required()
+def update_account():
+
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    # Get the new username from the request form data
+    new_username = request.form.get("username")
+    if new_username:
+        user.username = new_username
+
+    # Check if a new image file is provided
+    if "file" in request.files:
+        old_img_name = user.img  # Get the old image path for deletion
+        file = request.files["file"]
+        new_img_name = handle_uploaded_file(file, app.config["UPLOAD_FOLDER"])
+
+        if old_img_name and os.path.exists(f'{app.config["UPLOAD_FOLDER"]}/{old_img_name}'):
+            os.remove(f'{app.config["UPLOAD_FOLDER"]}/{old_img_name}')  # Delete the old image file
+
+        user.img = new_img_name
+
+    db.session.commit()
+
+    access_token = create_access_token(identity=user.id)
+    # Return the updated user details in the response
+    user_info = {
+        "email": user.email,
+        "img_url": f'http://localhost:5000/static/images/uploads/{user.img}',
+        "username": user.get_username(),
+        "courses": [],
+        "scores": [],
+        "token": access_token,
+    }
+
+    for grade in user.grades:
+        score = {"course_name": grade.course.name, "score": grade.score}
+        user_info["courses"].append(grade.course.name)
+        user_info["scores"].append(score)
+
+    return jsonify(user_info)
+
+
+@app.route("/delete_account", methods=["DELETE"])
+@jwt_required()
+def delete_account():
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    # Delete the user from the database
+    db.session.delete(user)
+    db.session.commit()
+
+    return jsonify({"message": "Account deleted successfully"}), 200
+
+
+
 
 
 if __name__ == "__main__":

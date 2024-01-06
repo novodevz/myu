@@ -22,6 +22,26 @@
         #main-body {
             margin: 20px;
         }
+
+        /* Add custom styles for the update form container */
+        #updateFormContainer {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        /* Add custom styles for the update form */
+        #updateForm {
+            background: white;
+            padding: 20px;
+            width: 50%;
+            margin: 100px auto;
+            border-radius: 10px;
+        }
     </style>
 </head>
 
@@ -32,11 +52,10 @@
             <img id="profile-image" alt="Profile Image" style="width: 50px; height: 50px; border-radius: 50%;">
             <strong id="username"></strong>
         </div>
-    
+
         <!-- Logout option -->
         <a class="btn btn-danger" onclick="logout()">Logout</a>
     </div>
-    
 
     <div id="main-body">
         <!-- User details from the User table -->
@@ -45,8 +64,10 @@
         <!-- Add more user details here -->
 
         <!-- Options to update and delete account -->
-        <button class="btn btn-primary" onclick="updateAccount()">Update Account</button>
+        <button class="btn btn-primary" onclick="showUpdateForm()">Update Account</button>
         <button class="btn btn-danger" onclick="deleteAccount()">Delete Account</button>
+
+
 
         <hr>
 
@@ -54,6 +75,24 @@
         <h2>Your Grades</h2>
         <ul id="grades-list"></ul>
         <!-- Add more grade details here -->
+    </div>
+
+    <!-- Update Form Container -->
+    <div id="updateFormContainer">
+        <!-- Update Form -->
+        <form id="updateForm" class="mt-4" enctype="multipart/form-data" onsubmit="return false">
+            <h2 class="mb-4">Update Account</h2>
+            <div class="mb-3">
+                <label for="newUsername" class="form-label">New Username:</label>
+                <input type="text" class="form-control" id="newUsername" placeholder="New Username">
+            </div>
+            <div class="mb-3">
+                <label for="newImage" class="form-label">New Profile Picture:</label>
+                <input type="file" class="form-control" id="newImage" accept="image/*">
+            </div>
+            <button type="button" class="btn btn-primary" onclick="submitUpdateForm(event)">Update</button>
+            <button type="button" onclick="cancelUpdateForm()" class="btn btn-secondary">Cancel</button>
+        </form>
     </div>
 
     <!-- Bootstrap JS bundle (includes Popper.js) -->
@@ -66,19 +105,21 @@
     <script>
         // Retrieving userData from sessionStorage
         const userData = JSON.parse(sessionStorage.getItem('userData'));
-        console.log(userData);
 
         const updateUI = (userInfo) => {
             // Update topbar with user's profile image and username
-            document.getElementById('profile-image').src = userInfo.img_url;
             document.getElementById('username').textContent = userInfo.username;
+            const profileImageElement = document.getElementById('profile-image');
+            profileImageElement.src = userInfo.img_url;
 
             // Update user details
             const userEmailElement = document.getElementById('user-email');
-            userEmailElement.textContent = userInfo.email; // Set user email dynamically
+            userEmailElement.textContent = userInfo.email;
 
             // Update grades
             const gradesList = document.getElementById('grades-list');
+            gradesList.innerHTML = '';
+
             userInfo.scores.forEach((score) => {
                 const listItem = document.createElement('li');
                 listItem.textContent = `${score.course_name}: ${score.score}`;
@@ -86,27 +127,101 @@
             });
         };
 
+        const showUpdateForm = () => {
+            document.getElementById('updateFormContainer').style.display = 'block';
+        };
+
+        const cancelUpdateForm = () => {
+            document.getElementById('updateFormContainer').style.display = 'none';
+        };
+
+        const deleteAccount = async () => {
+            const confirmDelete = confirm("Are you sure you want to delete your account? This action is irreversible.");
+
+            if (confirmDelete) {
+                try {
+                    const response = await axios.delete('http://localhost:5000/delete_account', {
+                        headers: {
+                            'Authorization': `Bearer ${userData.token}`
+                        },
+                    });
+
+                    console.log('Delete Response:', response);
+
+                    // Clear user data from sessionStorage
+                    sessionStorage.removeItem('userData');
+
+                    // Redirect to index.html after successful deletion
+                    window.location.href = 'index.html';
+                } catch (error) {
+                    console.error('Delete account error:', error);
+
+                    // Check if there's a response from the server with more details
+                    if (error.response) {
+                        console.error('Response data:', error.response.data);
+                    }
+
+                    alert('Delete account failed. Please try again.');
+                }
+            }
+        };
+
+
+        const submitUpdateForm = async () => {
+            console.log('Token:', userData.token);
+
+            const newUsername = document.getElementById('newUsername').value;
+            const newImage = document.getElementById('newImage').files[0];
+
+            const formData = new FormData();
+            formData.append('username', newUsername);
+            formData.append('file', newImage);
+
+            try {
+                const response = await axios.post('http://localhost:5000/update_account', formData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                        'Authorization': `Bearer ${userData.token}`,
+                    },
+                });
+
+                console.log('Response:', response);  // Log the entire response object
+                console.log('Data:', response.data);  // Log the response data
+
+                // Store the updated user information in the session
+                sessionStorage.setItem('userData', JSON.stringify(response.data));
+
+                // Update UI with the new data
+                // updateUI(response.data);
+
+                // Hide the update form
+                cancelUpdateForm();
+            } catch (error) {
+                console.error('Update account error:', error);
+
+                // Check if there's a response from the server with more details
+                if (error.response) {
+                    console.error('Response data:', error.response.data);
+                }
+
+                alert('Update account failed. Please try again.');
+            }
+        };
+
         // Call updateUI with userData after the DOM is fully loaded
         document.addEventListener("DOMContentLoaded", () => {
-            updateUI(userData);
+            updateUI(userData); // Update UI with initial data
         });
-
-        const updateAccount = () => {
-            // Implement update account logic (e.g., show a form to update details)
-            alert('Update account logic goes here!');
-        };
-
-        const deleteAccount = () => {
-            // Implement delete account logic (e.g., show confirmation dialog)
-            alert('Delete account logic goes here!');
-        };
 
         const logout = () => {
             // Implement logout logic (e.g., make a request to logout endpoint)
+            // Clear session storage
+            sessionStorage.clear();
             // Redirect to index.html after successful logout
             window.location.href = 'index.html';
         };
     </script>
+
 </body>
 
 </html>

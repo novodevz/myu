@@ -56,7 +56,7 @@ def handle_uploaded_file(file, upload_folder):
         img.save(img_path, format="JPEG", quality=quality)
 
         # Return the stored path
-        return file.name
+        return filename
 
     return None
 
