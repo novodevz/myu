@@ -19,6 +19,7 @@ app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///myU.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["ROOT_URL"] = "localhost:5000/"
 app.config["UPLOAD_FOLDER"] = "static/images/uploads"
+print(app.config["UPLOAD_FOLDER"])
 app.config["DEFAULT_IMG"] = "static/images/default.jpg"
 
 # Configure JWT settings
@@ -57,7 +58,9 @@ class User(db.Model):
         self.username = username or self.get_username()
 
     def get_username(self):
-        return self.email.split("@")[0]
+        default_name = self.email.split("@")[0]
+        if self.username == default_name: return default_name
+        else: return self.username
 
 
 # Course class
@@ -157,7 +160,7 @@ def login():
             # Fetch additional information for the account.html
             user_info = {
                 "email": user.email,
-                "img_url": f"http://localhost:5000/{user.img}",
+                "img_url": f"http://localhost:5000/{app.config["UPLOAD_FOLDER"]}/{user.img}",
                 "username": user.get_username(),
                 "courses": [],  # List to store course information
                 "scores": [],
