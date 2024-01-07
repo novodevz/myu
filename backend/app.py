@@ -15,6 +15,7 @@ from flask_jwt_extended import (
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from image_handler import handle_uploaded_file
+from sqlalchemy.exc import IntegrityError
 
 app = Flask(__name__)
 
@@ -254,11 +255,20 @@ def delete_account():
     if not user:
         return jsonify({"error": "User not found"}), 404
 
-    # Delete the user from the database
-    db.session.delete(user)
-    db.session.commit()
+    try:
+        # Delete related data (grades) first
+        Grade.query.filter_by(user_id=user.id).delete()
 
-    return jsonify({"message": "Account deleted successfully"}), 200
+        # Delete the user from the database
+        db.session.delete(user)
+        db.session.commit()
+
+        return jsonify({"message": "Account deleted successfully"}), 200
+
+    except IntegrityError:
+        # Handle integrity error (e.g., if there are foreign key constraints)
+        db.session.rollback()
+        return jsonify({"error": "Failed to delete account due to integrity constraints"}), 500
 
 
 
