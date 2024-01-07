@@ -18,13 +18,11 @@ from image_handler import handle_uploaded_file
 
 app = Flask(__name__)
 
-CORS(app)
 
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///myU.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["ROOT_URL"] = "localhost:5000/"
 app.config["UPLOAD_FOLDER"] = "static/images/uploads"
-print(app.config["UPLOAD_FOLDER"])
 app.config["DEFAULT_IMG"] = "static/images/default.jpg"
 
 # Configure JWT settings
@@ -54,18 +52,13 @@ class User(db.Model):
     # Define one-to-many relationship with Grade
     grades = db.relationship("Grade", backref="user", lazy=True)
 
-    def __init__(self, email, hashed_pw, img, username=None):
+    def __init__(self, email, hashed_pw, img):
         self.email = email
         self.hashed_pw = hashed_pw
         self.img = img
 
         # Set the username based on the email if not provided
-        self.username = username or self.get_username()
-
-    def get_username(self):
-        default_name = self.email.split("@")[0]
-        if self.username == default_name: return default_name
-        else: return self.username
+        self.username = self.email.split("@")[0]
 
 
 # Course class
@@ -86,11 +79,13 @@ class Grade(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     course_id = db.Column(db.Integer, db.ForeignKey("course.id"), nullable=False)
 
+CORS(app)
 
 # Index endpoint
 @app.route("/")
 def index():
     return jsonify({"message": "Welcome to myU"})
+
 
 
 # Signup endpoint with image upload
@@ -100,7 +95,6 @@ async def signup():
     password = request.form.get("password")
 
     # Check if email already exists
-    # (Assuming you have a User model with an email field)
     existing_user = User.query.filter_by(email=email).first()
     if existing_user:
         return (
@@ -111,10 +105,10 @@ async def signup():
     # Hash the password before storing it
     hashed_pw = bcrypt.generate_password_hash(password).decode("utf-8")
 
-    # Upload and save the user's image
+    # handel and save the user's image
     if "file" in request.files:
         file = request.files["file"]
-        new_img_name = handle_uploaded_file(file, app.config.UPLOAD_FOLDER)
+        new_img_name = handle_uploaded_file(file, app.config["UPLOAD_FOLDER"])
     else:
         new_img_name = app.config["DEFAULT_IMG"]
 
@@ -166,7 +160,7 @@ def login():
             user_info = {
                 "email": user.email,
                 "img_url": f"http://localhost:5000/{app.config["UPLOAD_FOLDER"]}/{user.img}",
-                "username": user.get_username(),
+                "username": user.username,
                 "courses": [],  # List to store course information
                 "scores": [],
                 "token": access_token,
@@ -200,8 +194,6 @@ def logout():
 
 
 import os
-
-CORS(app, resources={r"/update_account": {"origins": "http://127.0.0.1:5500"}})
 
 
 # Update the /update_account endpoint
@@ -238,7 +230,7 @@ def update_account():
     user_info = {
         "email": user.email,
         "img_url": f'http://localhost:5000/static/images/uploads/{user.img}',
-        "username": user.get_username(),
+        "username": user.username,
         "courses": [],
         "scores": [],
         "token": access_token,

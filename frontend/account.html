@@ -67,8 +67,6 @@
         <button class="btn btn-primary" onclick="showUpdateForm()">Update Account</button>
         <button class="btn btn-danger" onclick="deleteAccount()">Delete Account</button>
 
-
-
         <hr>
 
         <!-- User details from the Grade table -->
@@ -90,7 +88,7 @@
                 <label for="newImage" class="form-label">New Profile Picture:</label>
                 <input type="file" class="form-control" id="newImage" accept="image/*">
             </div>
-            <button type="button" class="btn btn-primary" onclick="submitUpdateForm(event)">Update</button>
+            <button type="button" class="btn btn-primary" onclick="submitUpdateForm()">Update</button>
             <button type="button" onclick="cancelUpdateForm()" class="btn btn-secondary">Cancel</button>
         </form>
     </div>
@@ -105,7 +103,7 @@
     <script>
         // Retrieving userData from sessionStorage
         const userData = JSON.parse(sessionStorage.getItem('userData'));
-
+        console.log(userData);
         const updateUI = (userInfo) => {
             // Update topbar with user's profile image and username
             document.getElementById('username').textContent = userInfo.username;
@@ -168,7 +166,6 @@
 
 
         const submitUpdateForm = async () => {
-            console.log('Token:', userData.token);
 
             const newUsername = document.getElementById('newUsername').value;
             const newImage = document.getElementById('newImage').files[0];
@@ -185,13 +182,10 @@
                     },
                 });
 
-                console.log('Response:', response);  // Log the entire response object
-                console.log('Data:', response.data);  // Log the response data
-
                 // Store the updated user information in the session
                 sessionStorage.setItem('userData', JSON.stringify(response.data));
 
-                // Update UI with the new data
+                // Update UI with the new data // didn't work because of auto page reload
                 // updateUI(response.data);
 
                 // Hide the update form
