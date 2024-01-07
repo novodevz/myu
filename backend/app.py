@@ -23,7 +23,7 @@ app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///myU.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["ROOT_URL"] = "localhost:5000/"
 app.config["UPLOAD_FOLDER"] = "static/images/uploads"
-app.config["DEFAULT_IMG"] = "static/images/default.jpg"
+app.config["DEFAULT_IMG"] = "static/images/uploads/default.jpg"
 
 # Configure JWT settings
 app.config["JWT_SECRET_KEY"] = "your-secret-key"  # Change this to a secure secret key
@@ -110,7 +110,7 @@ async def signup():
         file = request.files["file"]
         new_img_name = handle_uploaded_file(file, app.config["UPLOAD_FOLDER"])
     else:
-        new_img_name = app.config["DEFAULT_IMG"]
+        new_img_name = 'default.jpg'
 
     # Add new user to the database
     new_user = User(email=email, hashed_pw=hashed_pw, img=new_img_name)
@@ -155,6 +155,7 @@ def login():
             # Using Flask-JWT-Extended
             # global conf added at the top
             access_token = create_access_token(identity=user.id)
+
 
             # Fetch additional information for the account.html
             user_info = {
